@@ -1,4 +1,4 @@
-.PHONY: run build test clean
+.PHONY: run build test clean generate
 
 run:
 	go run cmd/server/main.go
@@ -11,6 +11,9 @@ test:
 
 clean:
 	rm -rf bin/
+
+generate:
+	./scripts/generate-bindings.sh	
 
 install:
 	go mod download
