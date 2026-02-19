@@ -1,4 +1,4 @@
-.PHONY: run build test clean generate
+.PHONY: run build clean generate test test-unit test-integration test-coverage
 
 run:
 	go run cmd/server/main.go
@@ -8,6 +8,16 @@ build:
 
 test:
 	go test -v ./...
+
+test-unit:
+	go test -v -short ./...
+
+test-integration:
+	go test -v -run Integration ./test/integration/...
+
+test-coverage:
+	go test -v -coverprofile=coverage.out ./...
+	go tool cover -html=coverage.out -o coverage.html	
 
 clean:
 	rm -rf bin/
