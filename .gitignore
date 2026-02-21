@@ -27,3 +27,7 @@ go.work
 .idea/
 *.swp
 *.swo
+
+# Coverage
+coverage.html
+coverage.out

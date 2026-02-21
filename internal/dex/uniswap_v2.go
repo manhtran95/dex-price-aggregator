@@ -19,6 +19,11 @@ type UniswapV2 struct {
 	factory *contracts.UniswapV2Factory
 }
 
+type Reserves struct {
+	Reserve0 *big.Int
+	Reserve1 *big.Int
+}
+
 func NewUniswapV2(client *ethclient.Client) (*UniswapV2, error) {
 	factoryAddr := common.HexToAddress("0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f")
 	factory, err := contracts.NewUniswapV2Factory(factoryAddr, client)
@@ -166,11 +171,6 @@ func (u *UniswapV2) calculateOutput(amountIn, reserveIn, reserveOut *big.Int) *b
 	denominator := new(big.Int).Mul(reserveIn, big.NewInt(1000))
 	denominator.Add(denominator, amountInWithFee)
 	return new(big.Int).Div(numerator, denominator)
-}
-
-type Reserves struct {
-	Reserve0 *big.Int
-	Reserve1 *big.Int
 }
 
 func sortTokens(tokenA, tokenB common.Address) (common.Address, common.Address) {

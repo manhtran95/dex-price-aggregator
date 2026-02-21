@@ -12,7 +12,7 @@ type Config struct {
 
 func Load() (*Config, error) {
 	return &Config{
-		EthereumRPC: getEnv("ETHEREUM_RPC", "https://mainnet.infura.io/v3/YOUR-PROJECT-ID"),
+		EthereumRPC: getEnv("ETHEREUM_MAINNET_RPC", "https://mainnet.infura.io/v3/YOUR-PROJECT-ID"),
 		Port:        getEnv("PORT", "8080"),
 		Environment: getEnv("ENVIRONMENT", "development"),
 	}, nil

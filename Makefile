@@ -1,3 +1,6 @@
+-include .env
+export
+
 .PHONY: run build clean generate test test-unit test-integration test-coverage
 
 run:
@@ -13,6 +16,7 @@ test-unit:
 	go test -v -short ./...
 
 test-integration:
+	@echo "Running integration tests (using ETHEREUM_MAINNET_RPC environment variable)"
 	go test -v -run Integration ./test/integration/...
 
 test-coverage:

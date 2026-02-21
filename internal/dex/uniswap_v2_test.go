@@ -49,6 +49,56 @@ func TestCalculateOutput(t *testing.T) {
 	}
 }
 
+func TestCalculatePrice(t *testing.T) {
+	tests := []struct {
+		name         string
+		amountOut    *big.Int
+		amountIn     *big.Int
+		decimalsOut  uint8
+		decimalsIn   uint8
+		expectedMin  float64
+		expectedMax  float64
+	}{
+		{
+			name:        "1 ETH to USDC",
+			amountOut:   big.NewInt(1958000000),           // 1958 USDC (6 decimals)
+			amountIn:    big.NewInt(1000000000000000000),  // 1 ETH (18 decimals)
+			decimalsOut: 6,
+			decimalsIn:  18,
+			expectedMin: 1957.9,
+			expectedMax: 1958.1,
+		},
+		{
+			name:        "0.1 ETH to USDC",
+			amountOut:   big.NewInt(195800000),            // 195.8 USDC
+			amountIn:    big.NewInt(100000000000000000),   // 0.1 ETH
+			decimalsOut: 6,
+			decimalsIn:  18,
+			expectedMin: 1957.9,
+			expectedMax: 1958.1,
+		},
+		{
+			name:        "Same decimals",
+			amountOut:   big.NewInt(2000000000000000000),  // 2 tokens
+			amountIn:    big.NewInt(1000000000000000000),  // 1 token
+			decimalsOut: 18,
+			decimalsIn:  18,
+			expectedMin: 1.99,
+			expectedMax: 2.01,
+		},
+	}
+	
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			price := calculatePrice(tt.amountOut, tt.amountIn, tt.decimalsOut, tt.decimalsIn)
+			
+			assert.Greater(t, price, tt.expectedMin, "Price should be greater than min")
+			assert.Less(t, price, tt.expectedMax, "Price should be less than max")
+		})
+	}
+}
+
+
 func TestSortTokens(t *testing.T) {
 	tokenA := common.HexToAddress("0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2") // WETH
 	tokenB := common.HexToAddress("0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48") // USDC
