@@ -33,9 +33,15 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to initialize Uniswap V2: %v", err)
 	}
+
+	uniswapV3, err := dex.NewUniswapV3(client.Client())
+	if err != nil {
+		log.Fatalf("Failed to initialize Uniswap V3: %v", err)
+	}	
 		
 	dexes := []dex.DEX{
 		uniswapV2,
+		uniswapV3,
 		// dex.NewSushiSwap(client.Client()),  // add later
 	}
 

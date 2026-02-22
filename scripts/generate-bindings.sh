@@ -18,4 +18,16 @@ abigen --abi=contracts/abis/ERC20.json \
        --type=ERC20 \
        --out=internal/contracts/erc20.go
 
+# Generate Uniswap V3 Factory bindings
+abigen --abi=contracts/abis/UniswapV3Factory.json \
+       --pkg=contracts \
+       --type=UniswapV3Factory \
+       --out=internal/contracts/uniswap_v3_factory.go
+
+# Generate Uniswap V3 Quoter bindings
+abigen --abi=contracts/abis/UniswapV3Quoter.json \
+       --pkg=contracts \
+       --type=UniswapV3Quoter \
+       --out=internal/contracts/uniswap_v3_quoter.go
+
 echo "✅ Contract bindings generated!"
