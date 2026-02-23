@@ -43,7 +43,7 @@ func (h *Handlers) HealthCheck(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(response)
 }
 
-func (h *Handlers) GetQuote(w http.ResponseWriter, r *http.Request) {
+func (h *Handlers) GetBestRoute(w http.ResponseWriter, r *http.Request) {
 	var req models.SwapRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
@@ -59,7 +59,7 @@ func (h *Handlers) GetQuote(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	bestRoute, allRoutes, err := h.aggregator.FindBestRoute(r.Context(), tokenIn, tokenOut, amount)
+	bestRoute, allRoutes, err := h.aggregator.FindBestRouteWithGraph(r.Context(), tokenIn, tokenOut, amount)
 	if err != nil {
 		http.Error(w, "Failed to find routes", http.StatusInternalServerError)
 		return

@@ -44,6 +44,44 @@ func (u *UniswapV3) Name() string {
 	return "UniswapV3"
 }
 
+func (u *UniswapV3) GetQuoteForSpecificPool(
+	ctx context.Context,
+	tokenIn, tokenOut common.Address,
+	amountIn *big.Int,
+	fee uint32,
+) (*models.Quote, error) {
+
+	// Fetch token info
+	tokenInInfo, err := u.getTokenInfo(tokenIn)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get input token info: %w", err)
+	}
+
+	tokenOutInfo, err := u.getTokenInfo(tokenOut)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get output token info: %w", err)
+	}	
+
+	// Get quote for ONLY this fee tier
+	amountOut, err := u.getQuoteForFee(ctx, tokenIn, tokenOut, amountIn, fee)
+	if err != nil {
+		return nil, err
+	}
+
+	price := calculatePriceV3(amountOut, amountIn, tokenOutInfo.Decimals, tokenInInfo.Decimals)
+
+	log.Printf("UniswapV3 quote for specific pool - tokenIn, tokenOut, amountOut, fee: %s %s %s %d", tokenIn.Hex(), tokenOut.Hex(), amountOut.String(), fee)
+
+	return &models.Quote{
+		DEX:          u.Name(),
+		InputToken:   tokenInInfo,
+		OutputToken:  tokenOutInfo,
+		InputAmount:  amountIn,
+		OutputAmount: amountOut,
+		Price:        price,
+	}, nil
+}
+
 func (u *UniswapV3) GetQuote(
 	ctx context.Context,
 	tokenIn, tokenOut common.Address,

@@ -17,7 +17,7 @@ func NewRouter(client *blockchain.Client, cfg *config.Config, agg *aggregator.Ag
 
 	api := r.PathPrefix("/api/v1").Subrouter()
 	api.HandleFunc("/health", h.HealthCheck).Methods("GET")
-	api.HandleFunc("/quote", h.GetQuote).Methods("POST")
+	api.HandleFunc("/quote", h.GetBestRoute).Methods("POST")
 	api.HandleFunc("/compare", h.ComparePrices).Methods("POST")
 
 	c := cors.New(cors.Options{
