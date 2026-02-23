@@ -25,13 +25,29 @@ type Quote struct {
 	GasEstimate  uint64   `json:"gasEstimate,omitempty"`
 }
 
-// Route represents a swap route (can be multi-hop)
+type RouteResponse struct {
+	BestRoute Route   `json:"bestRoute"`
+	AllRoutes []Route `json:"allRoutes"`
+}
+
+// Route represents a swap route (can be multi-hop, multi-DEX)
 type Route struct {
-	Path        []Token  `json:"path"`
-	Quotes      []Quote  `json:"quotes"`
-	TotalOutput *big.Int `json:"totalOutput"`
+	Path        []Token  `json:"path"`        // [WETH, DAI, USDC]
+	Hops        []Hop    `json:"hops"`        // Details of each swap
+	TotalOutput *big.Int `json:"totalOutput"` // Final amount out
 	PriceImpact float64  `json:"priceImpact"`
 	GasEstimate uint64   `json:"gasEstimate"`
+}
+
+// Hop represents a single swap in a route
+type Hop struct {
+	DEX          string   `json:"dex"`           // "UniswapV3"
+	TokenIn      Token    `json:"tokenIn"`       // WETH
+	TokenOut     Token    `json:"tokenOut"`      // DAI
+	InputAmount  *big.Int `json:"inputAmount"`   // 1 ETH
+	OutputAmount *big.Int `json:"outputAmount"`  // 2000 DAI
+	Price        float64  `json:"price"`         // 2000.00
+	Fee          string   `json:"fee,omitempty"` // "0.3%" (for V3)
 }
 
 // SwapRequest represents an API request for a swap quote

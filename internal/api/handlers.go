@@ -59,15 +59,15 @@ func (h *Handlers) GetQuote(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	bestQuote, allQuotes, err := h.aggregator.GetBestQuote(r.Context(), tokenIn, tokenOut, amount)
+	bestRoute, allRoutes, err := h.aggregator.FindBestRoute(r.Context(), tokenIn, tokenOut, amount)
 	if err != nil {
-		http.Error(w, "Failed to get quotes", http.StatusInternalServerError)
+		http.Error(w, "Failed to find routes", http.StatusInternalServerError)
 		return
 	}
 
-	response := models.SwapResponse{
-		BestQuote: *bestQuote,
-		AllQuotes: allQuotes,
+	response := models.RouteResponse{
+		BestRoute: *bestRoute,
+		AllRoutes: allRoutes,
 	}
 
 	w.Header().Set("Content-Type", "application/json")
