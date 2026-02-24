@@ -30,13 +30,21 @@ type RouteResponse struct {
 	AllRoutes []Route `json:"allRoutes"`
 }
 
+type RouteWithGas struct {
+	Route          *Route
+	GasEstimate    uint64
+	GasPriceGwei   float64
+	GasCostETH     float64
+	GasCostUSD     float64
+	OutputValueUSD float64
+	NetValueUSD    float64
+}
+
 // Route represents a swap route (can be multi-hop, multi-DEX)
 type Route struct {
 	Path        []Token  `json:"path"`        // [WETH, DAI, USDC]
 	Hops        []Hop    `json:"hops"`        // Details of each swap
 	TotalOutput *big.Int `json:"totalOutput"` // Final amount out
-	PriceImpact float64  `json:"priceImpact"`
-	GasEstimate uint64   `json:"gasEstimate"`
 }
 
 // Hop represents a single swap in a route

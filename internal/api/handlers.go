@@ -43,31 +43,45 @@ func (h *Handlers) HealthCheck(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(response)
 }
 
-func (h *Handlers) GetBestRoute(w http.ResponseWriter, r *http.Request) {
+func (h *Handlers) GetRouteWithGas(w http.ResponseWriter, r *http.Request) {
+	const MAX_HOPS = 3
 	var req models.SwapRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		http.Error(w, "Invalid request", http.StatusBadRequest)
 		return
 	}
 
 	tokenIn := common.HexToAddress(req.InputToken)
 	tokenOut := common.HexToAddress(req.OutputToken)
-
 	amount := new(big.Int)
-	if _, ok := amount.SetString(req.Amount, 10); !ok {
-		http.Error(w, "Invalid amount", http.StatusBadRequest)
-		return
-	}
+	amount.SetString(req.Amount, 10)
 
-	bestRoute, allRoutes, err := h.aggregator.FindBestRouteWithGraph(r.Context(), tokenIn, tokenOut, amount)
+	// Find best route considering gas
+	outputTokenPriceUSD := 1.0 // USDC = $1
+	bestRoute, allRoutes, err := h.aggregator.FindBestRouteWithGas(
+		r.Context(),
+		tokenIn,
+		tokenOut,
+		amount,
+		MAX_HOPS, // max hops
+		outputTokenPriceUSD,
+	)
 	if err != nil {
-		http.Error(w, "Failed to find routes", http.StatusInternalServerError)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	response := models.RouteResponse{
-		BestRoute: *bestRoute,
+	// Get current gas price for display
+	gasEstimator := h.aggregator.GetGasEstimator()
+	gasPriceGwei, _ := gasEstimator.GetCurrentGasPrice(r.Context())
+
+	response := RouteResponseWithGas{
+		BestRoute: bestRoute,
 		AllRoutes: allRoutes,
+		GasInfo: &GasInfo{
+			CurrentGasPriceGwei: gasPriceGwei,
+			ETHPriceUSD:         gasEstimator.GetETHPrice(),
+		},
 	}
 
 	w.Header().Set("Content-Type", "application/json")

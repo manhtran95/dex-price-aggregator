@@ -51,7 +51,7 @@ func main() {
 	}
 
 	// Initialize aggregator
-	agg := aggregator.NewAggregator(dexes)
+	agg := aggregator.NewAggregator(dexes, client.Client())
 
 	// Initialize router - pass aggregator in
 	router := api.NewRouter(client, cfg, agg)

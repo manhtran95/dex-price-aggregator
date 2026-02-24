@@ -23,7 +23,7 @@ type Edge struct {
 }
 
 type Path struct {
-	Tokens []common.Address // [WETH, DAI, USDC]
+	Tokens []common.Address // [WETH, DAI, USDC] - addresses only, token metadata resolved at quote time
 	Edges  []*Edge          // Specific pool for each hop
 }
 

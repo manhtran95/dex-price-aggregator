@@ -8,25 +8,34 @@ import (
 	"sync"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/manhtran95/dex-price-aggregator/internal/dex"
 	"github.com/manhtran95/dex-price-aggregator/internal/models"
 )
 
 type Aggregator struct {
-	dexes map[string]dex.DEX // Changed to map for lookup by name
-	graph *Graph
+	dexes        map[string]dex.DEX // Changed to map for lookup by name
+	graph        *Graph
+	gasEstimator *GasEstimator // ← Add this
+	client       *ethclient.Client
 }
 
-func NewAggregator(dexes []dex.DEX) *Aggregator {
+func NewAggregator(dexes []dex.DEX, client *ethclient.Client) *Aggregator {
 	dexMap := make(map[string]dex.DEX)
 	for _, d := range dexes {
 		dexMap[d.Name()] = d
 	}
 
 	return &Aggregator{
-		dexes: dexMap,
-		graph: NewGraph(),
+		dexes:        dexMap,
+		graph:        NewGraph(),
+		gasEstimator: NewGasEstimator(client), // ← Initialize
+		client:       client,
 	}
+}
+
+func (a *Aggregator) GetGasEstimator() *GasEstimator {
+	return a.gasEstimator
 }
 
 // GetQuoteFromSpecificPool gets quote from a specific pool/DEX
@@ -70,6 +79,8 @@ func (a *Aggregator) CalculatePathOutput(
 
 	currentAmount := amountIn
 	hops := []models.Hop{}
+	// Collect enriched token metadata from quotes as we go
+	enrichedTokens := []models.Token{}
 
 	// Execute each hop in the path
 	for i, edge := range path.Edges {
@@ -81,6 +92,12 @@ func (a *Aggregator) CalculatePathOutput(
 		if err != nil {
 			return nil, fmt.Errorf("hop %d failed: %w", i, err)
 		}
+
+		// Harvest token metadata from quote
+		if i == 0 {
+			enrichedTokens = append(enrichedTokens, quote.InputToken)
+		}
+		enrichedTokens = append(enrichedTokens, quote.OutputToken)
 
 		// Add hop details
 		hop := models.Hop{
@@ -100,7 +117,7 @@ func (a *Aggregator) CalculatePathOutput(
 
 	// Build final route
 	route := &models.Route{
-		Path:        convertToTokens(path.Tokens),
+		Path:        enrichedTokens,
 		Hops:        hops,
 		TotalOutput: currentAmount,
 	}
@@ -108,39 +125,48 @@ func (a *Aggregator) CalculatePathOutput(
 	return route, nil
 }
 
-const MAX_HOPS = 3
-
-// FindBestRouteWithGraph uses graph-based routing
-func (a *Aggregator) FindBestRouteWithGraph(
+func (a *Aggregator) FindBestRouteWithGas(
 	ctx context.Context,
 	tokenIn, tokenOut common.Address,
 	amountIn *big.Int,
-) (*models.Route, []models.Route, error) {
+	maxHops int,
+	outputTokenPriceUSD float64,
+) (*models.RouteWithGas, []*models.RouteWithGas, error) {
 
-	// Find all possible paths
-	paths := a.graph.FindAllPaths(tokenIn, tokenOut, MAX_HOPS)
+	// Get current gas price
+	gasPriceGwei, err := a.gasEstimator.GetCurrentGasPrice(ctx)
+	if err != nil {
+		gasPriceGwei = 50.0 // Fallback
+	}
 
+	// Find all possible routes
+	paths := a.graph.FindAllPaths(tokenIn, tokenOut, maxHops)
 	if len(paths) == 0 {
 		return nil, nil, fmt.Errorf("no paths found")
 	}
 
-	var bestRoute *models.Route
-	allRoutes := []models.Route{}
+	var bestRoute *models.RouteWithGas
+	allRoutesWithGas := []*models.RouteWithGas{}
 
-	// Calculate output for each path
 	for _, path := range paths {
+		// Calculate route output
 		route, err := a.CalculatePathOutput(ctx, path, amountIn)
 		if err != nil {
-			// Skip paths that fail
-			log.Printf("Error calculating path output: %v", err)
 			continue
 		}
 
-		allRoutes = append(allRoutes, *route)
+		// Estimate gas and calculate net value
+		routeWithGas := a.gasEstimator.EstimateRoute(
+			route,
+			gasPriceGwei,
+			outputTokenPriceUSD,
+		)
 
-		// Track best route
-		if bestRoute == nil || route.TotalOutput.Cmp(bestRoute.TotalOutput) > 0 {
-			bestRoute = route
+		allRoutesWithGas = append(allRoutesWithGas, routeWithGas)
+
+		// Keep route with best NET value (not just highest output)
+		if bestRoute == nil || routeWithGas.NetValueUSD > bestRoute.NetValueUSD {
+			bestRoute = routeWithGas
 		}
 	}
 
@@ -148,15 +174,7 @@ func (a *Aggregator) FindBestRouteWithGraph(
 		return nil, nil, fmt.Errorf("all paths failed")
 	}
 
-	return bestRoute, allRoutes, nil
-}
-
-func convertToTokens(addresses []common.Address) []models.Token {
-	tokens := make([]models.Token, len(addresses))
-	for i, addr := range addresses {
-		tokens[i] = models.Token{Address: addr}
-	}
-	return tokens
+	return bestRoute, allRoutesWithGas, nil
 }
 
 // 1st version: get best quote from all DEXs

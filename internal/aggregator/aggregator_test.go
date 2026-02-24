@@ -56,7 +56,7 @@ func TestGetBestQuote(t *testing.T) {
 	}
 
 	// Create aggregator with mocks
-	agg := NewAggregator([]dex.DEX{mockDEX1, mockDEX2, mockDEX3})
+	agg := NewAggregator([]dex.DEX{mockDEX1, mockDEX2, mockDEX3}, nil)
 
 	// Test
 	tokenIn := common.HexToAddress("0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2")
@@ -74,7 +74,7 @@ func TestGetBestQuote(t *testing.T) {
 }
 
 func TestGetBestQuote_NoDEXs(t *testing.T) {
-	agg := NewAggregator([]dex.DEX{})
+	agg := NewAggregator([]dex.DEX{}, nil)
 
 	tokenIn := common.HexToAddress("0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2")
 	tokenOut := common.HexToAddress("0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48")
@@ -94,7 +94,7 @@ func TestGetBestQuote_AllDEXsFail(t *testing.T) {
 		},
 	}
 
-	agg := NewAggregator([]dex.DEX{mockDEX})
+	agg := NewAggregator([]dex.DEX{mockDEX}, nil)
 
 	tokenIn := common.HexToAddress("0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2")
 	tokenOut := common.HexToAddress("0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48")
