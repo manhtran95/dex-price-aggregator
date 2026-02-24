@@ -4,9 +4,12 @@ A Go-based service that aggregates prices from multiple decentralized exchanges 
 
 ## Features
 
-- Compare prices across multiple DEXs (Uniswap V2, Uniswap V3, SushiSwap)
-- Find the best swap rates
-- RESTful API
+- **Multi-DEX Support** — Uniswap V2, Uniswap V3, SushiSwap
+- **Multi-hop Graph-based Routing** — Finds optimal swap paths across up to 3 hops using a token graph
+- **Gas Estimation** — Estimates gas cost per route and factors it into best-route selection
+- **Rate Limiting** — Protects the API from abuse with configurable request rate limits
+- **Caching** — Caches quotes and token metadata to reduce RPC calls and improve latency
+- **Historical Price Tracking** — Records and queries historical swap prices for analytics
 
 ## Getting Started
 
