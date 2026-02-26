@@ -4,16 +4,13 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"math"
 	"math/big"
 	"strings"
 
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi"
-	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
-	"github.com/manhtran95/dex-price-aggregator/internal/contracts"
 	"github.com/manhtran95/dex-price-aggregator/internal/models"
 )
 
@@ -52,15 +49,15 @@ func (u *UniswapV3) GetQuoteForSpecificPool(
 ) (*models.Quote, error) {
 
 	// Fetch token info
-	tokenInInfo, err := u.getTokenInfo(tokenIn)
+	tokenInInfo, err := GetTokenInfo(u.client, tokenIn)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get input token info: %w", err)
 	}
 
-	tokenOutInfo, err := u.getTokenInfo(tokenOut)
+	tokenOutInfo, err := GetTokenInfo(u.client, tokenOut)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get output token info: %w", err)
-	}	
+	}
 
 	// Get quote for ONLY this fee tier
 	amountOut, err := u.getQuoteForFee(ctx, tokenIn, tokenOut, amountIn, fee)
@@ -68,7 +65,7 @@ func (u *UniswapV3) GetQuoteForSpecificPool(
 		return nil, err
 	}
 
-	price := calculatePriceV3(amountOut, amountIn, tokenOutInfo.Decimals, tokenInInfo.Decimals)
+	price := calculatePrice(amountOut, amountIn, tokenOutInfo.Decimals, tokenInInfo.Decimals)
 
 	log.Printf("UniswapV3 quote for specific pool - tokenIn, tokenOut, amountOut, fee: %s %s %s %d", tokenIn.Hex(), tokenOut.Hex(), amountOut.String(), fee)
 
@@ -89,12 +86,12 @@ func (u *UniswapV3) GetQuote(
 ) (*models.Quote, error) {
 
 	// Fetch token info
-	tokenInInfo, err := u.getTokenInfo(tokenIn)
+	tokenInInfo, err := GetTokenInfo(u.client, tokenIn)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get input token info: %w", err)
 	}
 
-	tokenOutInfo, err := u.getTokenInfo(tokenOut)
+	tokenOutInfo, err := GetTokenInfo(u.client, tokenOut)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get output token info: %w", err)
 	}
@@ -116,7 +113,7 @@ func (u *UniswapV3) GetQuote(
 		// Keep the best quote
 		if bestQuote == nil || amountOut.Cmp(bestQuote.OutputAmount) > 0 {
 			// Calculate price
-			price := calculatePriceV3(amountOut, amountIn, tokenOutInfo.Decimals, tokenInInfo.Decimals)
+			price := calculatePrice(amountOut, amountIn, tokenOutInfo.Decimals, tokenInInfo.Decimals)
 
 			bestQuote = &models.Quote{
 				DEX:          u.Name(),
@@ -187,47 +184,6 @@ func (u *UniswapV3) getQuoteForFee(
 	}
 
 	return output.AmountOut, nil
-}
-
-func (u *UniswapV3) getTokenInfo(tokenAddress common.Address) (models.Token, error) {
-	erc20, err := contracts.NewERC20(tokenAddress, u.client)
-	if err != nil {
-		return models.Token{}, err
-	}
-
-	symbol, err := erc20.Symbol(&bind.CallOpts{})
-	if err != nil {
-		return models.Token{}, err
-	}
-
-	name, err := erc20.Name(&bind.CallOpts{})
-	if err != nil {
-		return models.Token{}, err
-	}
-
-	decimals, err := erc20.Decimals(&bind.CallOpts{})
-	if err != nil {
-		return models.Token{}, err
-	}
-
-	return models.Token{
-		Address:  tokenAddress,
-		Symbol:   symbol,
-		Name:     name,
-		Decimals: decimals,
-	}, nil
-}
-
-func calculatePriceV3(amountOut, amountIn *big.Int, decimalsOut, decimalsIn uint8) float64 {
-	outFloat := new(big.Float).SetInt(amountOut)
-	inFloat := new(big.Float).SetInt(amountIn)
-
-	outFloat.Quo(outFloat, big.NewFloat(math.Pow10(int(decimalsOut))))
-	inFloat.Quo(inFloat, big.NewFloat(math.Pow10(int(decimalsIn))))
-
-	price := new(big.Float).Quo(outFloat, inFloat)
-	result, _ := price.Float64()
-	return result
 }
 
 // GetPairAddress is not used for V3, but included for interface compatibility

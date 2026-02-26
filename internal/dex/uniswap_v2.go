@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"math"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -56,12 +55,12 @@ func (u *UniswapV2) GetQuote(
 	}
 
 	// Fetch token info
-	tokenInInfo, err := u.getTokenInfo(tokenIn)
+	tokenInInfo, err := GetTokenInfo(u.client, tokenIn)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get input token info: %w", err)
 	}
 
-	tokenOutInfo, err := u.getTokenInfo(tokenOut)
+	tokenOutInfo, err := GetTokenInfo(u.client, tokenOut)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get output token info: %w", err)
 	}
@@ -90,47 +89,6 @@ func (u *UniswapV2) GetQuote(
 func (u *UniswapV2) GetPairAddress(tokenA, tokenB common.Address) (common.Address, error) {
 	// Clean! Just like Solidity ✅
 	return u.factory.GetPair(&bind.CallOpts{}, tokenA, tokenB)
-}
-
-func (u *UniswapV2) getTokenInfo(tokenAddress common.Address) (models.Token, error) {
-	erc20, err := contracts.NewERC20(tokenAddress, u.client)
-	if err != nil {
-		return models.Token{}, err
-	}
-
-	symbol, err := erc20.Symbol(&bind.CallOpts{})
-	if err != nil {
-		return models.Token{}, err
-	}
-
-	name, err := erc20.Name(&bind.CallOpts{})
-	if err != nil {
-		return models.Token{}, err
-	}
-
-	decimals, err := erc20.Decimals(&bind.CallOpts{})
-	if err != nil {
-		return models.Token{}, err
-	}
-
-	return models.Token{
-		Address:  tokenAddress,
-		Symbol:   symbol,
-		Name:     name,
-		Decimals: decimals,
-	}, nil
-}
-
-func calculatePrice(amountOut, amountIn *big.Int, decimalsOut, decimalsIn uint8) float64 {
-	outFloat := new(big.Float).SetInt(amountOut)
-	inFloat := new(big.Float).SetInt(amountIn)
-
-	outFloat.Quo(outFloat, big.NewFloat(math.Pow10(int(decimalsOut))))
-	inFloat.Quo(inFloat, big.NewFloat(math.Pow10(int(decimalsIn))))
-
-	price := new(big.Float).Quo(outFloat, inFloat)
-	result, _ := price.Float64()
-	return result
 }
 
 func (u *UniswapV2) getReserves(
