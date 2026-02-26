@@ -25,14 +25,14 @@ const (
 // GasEstimator handles all gas-related calculations
 type GasEstimator struct {
 	client         *ethclient.Client
-	ethPriceUSD    float64 // Could be fetched from oracle
+	ethPriceUSD    float64
 	defaultGasGwei float64
 }
 
 func NewGasEstimator(client *ethclient.Client) *GasEstimator {
 	return &GasEstimator{
 		client:         client,
-		ethPriceUSD:    2500.0, // Default, should fetch from oracle
+		ethPriceUSD:    2500.0,
 		defaultGasGwei: 50.0,
 	}
 }
@@ -143,6 +143,9 @@ func (g *GasEstimator) EstimateGasAccurate(
 
 // GetCurrentGasPrice fetches current network gas price
 func (g *GasEstimator) GetCurrentGasPrice(ctx context.Context) (float64, error) {
+	if g.client == nil {
+		return g.defaultGasGwei, fmt.Errorf("no RPC client configured")
+	}
 	gasPrice, err := g.client.SuggestGasPrice(ctx)
 	if err != nil {
 		return g.defaultGasGwei, err

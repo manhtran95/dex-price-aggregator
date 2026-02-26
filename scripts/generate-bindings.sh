@@ -30,4 +30,10 @@ abigen --abi=contracts/abis/UniswapV3Quoter.json \
        --type=UniswapV3Quoter \
        --out=internal/contracts/uniswap_v3_quoter.go
 
+# Generate Curve Pool bindings
+abigen --abi=contracts/abis/CurvePool.json \
+       --pkg=contracts \
+       --type=CurvePool \
+       --out=internal/contracts/curve_pool.go       
+
 echo "✅ Contract bindings generated!"

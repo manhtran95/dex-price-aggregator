@@ -44,10 +44,16 @@ func main() {
 		log.Fatalf("Failed to initialize SushiSwap: %v", err)
 	}
 
+    curve, err := dex.NewCurve(client.Client())
+    if err != nil {
+        log.Fatalf("Failed to initialize Curve: %v", err)
+    }	
+
 	dexes := []dex.DEX{
 		uniswapV2,
 		uniswapV3,
 		sushiSwap,
+		curve,
 	}
 
 	// Initialize aggregator

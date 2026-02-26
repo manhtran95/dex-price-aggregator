@@ -3,9 +3,7 @@ package aggregator
 import (
 	"context"
 	"fmt"
-	"log"
 	"math/big"
-	"sync"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -14,9 +12,9 @@ import (
 )
 
 type Aggregator struct {
-	dexes        map[string]dex.DEX // Changed to map for lookup by name
+	dexes        map[string]dex.DEX
 	graph        *Graph
-	gasEstimator *GasEstimator // ← Add this
+	gasEstimator *GasEstimator
 	client       *ethclient.Client
 }
 
@@ -29,7 +27,7 @@ func NewAggregator(dexes []dex.DEX, client *ethclient.Client) *Aggregator {
 	return &Aggregator{
 		dexes:        dexMap,
 		graph:        NewGraph(),
-		gasEstimator: NewGasEstimator(client), // ← Initialize
+		gasEstimator: NewGasEstimator(client),
 		client:       client,
 	}
 }
@@ -38,32 +36,56 @@ func (a *Aggregator) GetGasEstimator() *GasEstimator {
 	return a.gasEstimator
 }
 
-// GetQuoteFromSpecificPool gets quote from a specific pool/DEX
-func (a *Aggregator) GetQuoteFromSpecificPool(
+func (a *Aggregator) FindBestRouteWithGas(
 	ctx context.Context,
-	edge *Edge,
 	tokenIn, tokenOut common.Address,
 	amountIn *big.Int,
-) (*models.Quote, error) {
+	maxHops int,
+	outputTokenPriceUSD float64,
+) (*models.RouteWithGas, []*models.RouteWithGas, error) {
 
-	// Get the specific DEX
-	dexInstance, exists := a.dexes[edge.dex]
-	if !exists {
-		return nil, fmt.Errorf("DEX %s not found", edge.dex)
+	// Get current gas price
+	gasPriceGwei, err := a.gasEstimator.GetCurrentGasPrice(ctx)
+	if err != nil {
+		gasPriceGwei = 50.0 // Fallback
 	}
 
-	// For UniswapV3, we need to pass the specific fee tier
-	if edge.dex == "UniswapV3" {
-		// Call V3-specific method with fee
-		v3, ok := dexInstance.(*dex.UniswapV3)
-		if !ok {
-			return nil, fmt.Errorf("failed to cast to UniswapV3")
+	// Find all possible routes
+	paths := a.graph.FindAllPaths(tokenIn, tokenOut, maxHops)
+	if len(paths) == 0 {
+		return nil, nil, fmt.Errorf("no paths found")
+	}
+
+	var bestRoute *models.RouteWithGas
+	allRoutesWithGas := []*models.RouteWithGas{}
+
+	for _, path := range paths {
+		// Calculate route output
+		route, err := a.CalculatePathOutput(ctx, path, amountIn)
+		if err != nil {
+			continue
 		}
-		return v3.GetQuoteForSpecificPool(ctx, tokenIn, tokenOut, amountIn, edge.fee)
+
+		// Estimate gas and calculate net value
+		routeWithGas := a.gasEstimator.EstimateRoute(
+			route,
+			gasPriceGwei,
+			outputTokenPriceUSD,
+		)
+
+		allRoutesWithGas = append(allRoutesWithGas, routeWithGas)
+
+		// Keep route with best NET value (not just highest output)
+		if bestRoute == nil || routeWithGas.NetValueUSD > bestRoute.NetValueUSD {
+			bestRoute = routeWithGas
+		}
 	}
 
-	// For V2 and others, just call GetQuote normally
-	return dexInstance.GetQuote(ctx, tokenIn, tokenOut, amountIn)
+	if bestRoute == nil {
+		return nil, nil, fmt.Errorf("all paths failed")
+	}
+
+	return bestRoute, allRoutesWithGas, nil
 }
 
 // CalculatePathOutput calculates the output for a specific path
@@ -125,56 +147,49 @@ func (a *Aggregator) CalculatePathOutput(
 	return route, nil
 }
 
-func (a *Aggregator) FindBestRouteWithGas(
+// GetQuoteFromSpecificPool gets quote from a specific pool/DEX
+func (a *Aggregator) GetQuoteFromSpecificPool(
 	ctx context.Context,
+	edge *Edge,
 	tokenIn, tokenOut common.Address,
 	amountIn *big.Int,
-	maxHops int,
-	outputTokenPriceUSD float64,
-) (*models.RouteWithGas, []*models.RouteWithGas, error) {
+) (*models.Quote, error) {
 
-	// Get current gas price
-	gasPriceGwei, err := a.gasEstimator.GetCurrentGasPrice(ctx)
-	if err != nil {
-		gasPriceGwei = 50.0 // Fallback
+	// Get the specific DEX
+	dexInstance, exists := a.dexes[edge.dex]
+	if !exists {
+		return nil, fmt.Errorf("DEX %s not found", edge.dex)
 	}
 
-	// Find all possible routes
-	paths := a.graph.FindAllPaths(tokenIn, tokenOut, maxHops)
-	if len(paths) == 0 {
-		return nil, nil, fmt.Errorf("no paths found")
-	}
-
-	var bestRoute *models.RouteWithGas
-	allRoutesWithGas := []*models.RouteWithGas{}
-
-	for _, path := range paths {
-		// Calculate route output
-		route, err := a.CalculatePathOutput(ctx, path, amountIn)
-		if err != nil {
-			continue
+	// Handle Curve (needs token indices)
+	if edge.dex == "Curve" {
+		curve, ok := dexInstance.(*dex.Curve)
+		if !ok {
+			return nil, fmt.Errorf("failed to cast to Curve")
 		}
-
-		// Estimate gas and calculate net value
-		routeWithGas := a.gasEstimator.EstimateRoute(
-			route,
-			gasPriceGwei,
-			outputTokenPriceUSD,
+		return curve.GetQuoteForSpecificPool(
+			ctx,
+			edge.poolAddress,
+			tokenIn,
+			tokenOut,
+			amountIn,
+			edge.curveIndexI,
+			edge.curveIndexJ,
 		)
+	}
 
-		allRoutesWithGas = append(allRoutesWithGas, routeWithGas)
-
-		// Keep route with best NET value (not just highest output)
-		if bestRoute == nil || routeWithGas.NetValueUSD > bestRoute.NetValueUSD {
-			bestRoute = routeWithGas
+	// For UniswapV3, we need to pass the specific fee tier
+	if edge.dex == "UniswapV3" {
+		// Call V3-specific method with fee
+		v3, ok := dexInstance.(*dex.UniswapV3)
+		if !ok {
+			return nil, fmt.Errorf("failed to cast to UniswapV3")
 		}
+		return v3.GetQuoteForSpecificPool(ctx, tokenIn, tokenOut, amountIn, edge.fee)
 	}
 
-	if bestRoute == nil {
-		return nil, nil, fmt.Errorf("all paths failed")
-	}
-
-	return bestRoute, allRoutesWithGas, nil
+	// For V2 and others, just call GetQuote normally
+	return dexInstance.GetQuote(ctx, tokenIn, tokenOut, amountIn)
 }
 
 // 1st version: get best quote from all DEXs
@@ -226,3 +241,4 @@ func findBest(quotes []models.Quote) *models.Quote {
 	}
 	return best
 }
+*/
