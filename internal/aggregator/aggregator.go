@@ -178,6 +178,7 @@ func (a *Aggregator) FindBestRouteWithGas(
 }
 
 // 1st version: get best quote from all DEXs
+/*
 func (a *Aggregator) GetBestQuote(
 	ctx context.Context,
 	tokenIn, tokenOut common.Address,
