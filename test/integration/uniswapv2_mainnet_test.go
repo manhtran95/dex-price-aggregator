@@ -56,7 +56,6 @@ func TestUniswapV2Factory_GetPair_RealMainnet(t *testing.T) {
 	t.Logf("✓ WETH/USDC Pair Address: %s", pairAddress.Hex())
 }
 
-
 func TestERC20_GetTokenInfo_WETH(t *testing.T) {
 	client := getClient(t)
 	defer client.Close()
@@ -117,7 +116,7 @@ func TestUniswapV2_GetQuote_EndToEnd(t *testing.T) {
 	defer client.Close()
 
 	// Create UniswapV2 instance
-	uniswapV2, err := dex.NewUniswapV2(client)
+	uniswapV2, err := dex.NewUniswapV2(client, nil)
 	require.NoError(t, err)
 
 	// Test with WETH → USDC

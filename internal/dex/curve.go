@@ -9,6 +9,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/manhtran95/dex-price-aggregator/internal/cache"
 	"github.com/manhtran95/dex-price-aggregator/internal/contracts"
 	"github.com/manhtran95/dex-price-aggregator/internal/models"
 )
@@ -16,6 +17,7 @@ import (
 type Curve struct {
 	client *ethclient.Client
 	pools  map[string]*CurvePoolInfo
+	cache  *cache.RedisCache
 }
 
 type CurvePoolInfo struct {
@@ -24,9 +26,10 @@ type CurvePoolInfo struct {
 	name    string
 }
 
-func NewCurve(client *ethclient.Client) (*Curve, error) {
+func NewCurve(client *ethclient.Client, redisCache *cache.RedisCache) (*Curve, error) {
 	return &Curve{
 		client: client,
+		cache:  redisCache,
 		pools: map[string]*CurvePoolInfo{
 			"3pool": {
 				address: common.HexToAddress("0xbEbc44782C7dB0a1A60Cb6fe97d0b483032FF1C7"),
@@ -68,12 +71,12 @@ func (c *Curve) GetQuoteForSpecificPool(
 		return nil, err
 	}
 
-	// Fetch token metadata
-	tokenInInfo, err := GetTokenInfo(c.client, tokenIn)
+	// Fetch token metadata (cached)
+	tokenInInfo, err := GetTokenInfo(ctx, c.client, c.cache, tokenIn)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get input token info: %w", err)
 	}
-	tokenOutInfo, err := GetTokenInfo(c.client, tokenOut)
+	tokenOutInfo, err := GetTokenInfo(ctx, c.client, c.cache, tokenOut)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get output token info: %w", err)
 	}

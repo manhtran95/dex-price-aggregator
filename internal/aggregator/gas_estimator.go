@@ -8,6 +8,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/manhtran95/dex-price-aggregator/internal/cache"
 	"github.com/manhtran95/dex-price-aggregator/internal/models"
 )
 
@@ -25,13 +26,15 @@ const (
 // GasEstimator handles all gas-related calculations
 type GasEstimator struct {
 	client         *ethclient.Client
+	cache          *cache.RedisCache
 	ethPriceUSD    float64
 	defaultGasGwei float64
 }
 
-func NewGasEstimator(client *ethclient.Client) *GasEstimator {
+func NewGasEstimator(client *ethclient.Client, redisCache *cache.RedisCache) *GasEstimator {
 	return &GasEstimator{
 		client:         client,
+		cache:          redisCache,
 		ethPriceUSD:    2500.0,
 		defaultGasGwei: 50.0,
 	}
@@ -141,17 +144,32 @@ func (g *GasEstimator) EstimateGasAccurate(
 	*/
 }
 
-// GetCurrentGasPrice fetches current network gas price
+// GetCurrentGasPrice returns the current network gas price in Gwei.
+// Results are cached in Redis for 30 seconds to avoid hammering the RPC node.
 func (g *GasEstimator) GetCurrentGasPrice(ctx context.Context) (float64, error) {
+	// --- cache read ---
+	if g.cache != nil {
+		if cached, err := g.cache.GetGasPrice(ctx); err == nil && cached > 0 {
+			return cached, nil
+		}
+	}
+
 	if g.client == nil {
 		return g.defaultGasGwei, fmt.Errorf("no RPC client configured")
 	}
+
 	gasPrice, err := g.client.SuggestGasPrice(ctx)
 	if err != nil {
 		return g.defaultGasGwei, err
 	}
 
 	gasPriceGwei := float64(gasPrice.Int64()) / 1e9
+
+	// --- cache write (30-second TTL set inside SetGasPrice) ---
+	if g.cache != nil {
+		_ = g.cache.SetGasPrice(ctx, gasPriceGwei)
+	}
+
 	return gasPriceGwei, nil
 }
 

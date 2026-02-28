@@ -7,6 +7,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/manhtran95/dex-price-aggregator/internal/cache"
 	"github.com/manhtran95/dex-price-aggregator/internal/dex"
 	"github.com/manhtran95/dex-price-aggregator/internal/models"
 )
@@ -18,7 +19,7 @@ type Aggregator struct {
 	client       *ethclient.Client
 }
 
-func NewAggregator(dexes []dex.DEX, client *ethclient.Client) *Aggregator {
+func NewAggregator(dexes []dex.DEX, client *ethclient.Client, redisCache *cache.RedisCache) *Aggregator {
 	dexMap := make(map[string]dex.DEX)
 	for _, d := range dexes {
 		dexMap[d.Name()] = d
@@ -27,7 +28,7 @@ func NewAggregator(dexes []dex.DEX, client *ethclient.Client) *Aggregator {
 	return &Aggregator{
 		dexes:        dexMap,
 		graph:        NewGraph(),
-		gasEstimator: NewGasEstimator(client),
+		gasEstimator: NewGasEstimator(client, redisCache),
 		client:       client,
 	}
 }

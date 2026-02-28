@@ -35,7 +35,7 @@ func newAggregatorForTest(dexes []dex.DEX, g *Graph) *Aggregator {
 	return &Aggregator{
 		dexes:        dexMap,
 		graph:        g,
-		gasEstimator: NewGasEstimator(nil), // nil client → falls back to defaultGasGwei
+		gasEstimator: NewGasEstimator(nil, nil), // nil client+cache → falls back to defaultGasGwei
 	}
 }
 

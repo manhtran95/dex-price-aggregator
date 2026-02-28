@@ -11,6 +11,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/manhtran95/dex-price-aggregator/internal/cache"
 	"github.com/manhtran95/dex-price-aggregator/internal/models"
 )
 
@@ -21,9 +22,10 @@ type UniswapV3 struct {
 	quoterAddr  common.Address
 	quoterABI   abi.ABI
 	factoryAddr common.Address
+	cache       *cache.RedisCache
 }
 
-func NewUniswapV3(client *ethclient.Client) (*UniswapV3, error) {
+func NewUniswapV3(client *ethclient.Client, redisCache *cache.RedisCache) (*UniswapV3, error) {
 	parsedABI, err := abi.JSON(strings.NewReader(quoterV2ABI))
 	if err != nil {
 		return nil, err
@@ -34,6 +36,7 @@ func NewUniswapV3(client *ethclient.Client) (*UniswapV3, error) {
 		quoterAddr:  common.HexToAddress("0x61fFE014bA17989E743c5F6cB21bF9697530B21e"), // QuoterV2
 		quoterABI:   parsedABI,
 		factoryAddr: common.HexToAddress("0x1F98431c8aD98523631AE4a59f267346ea31F984"),
+		cache:       redisCache,
 	}, nil
 }
 
@@ -48,13 +51,13 @@ func (u *UniswapV3) GetQuoteForSpecificPool(
 	fee uint32,
 ) (*models.Quote, error) {
 
-	// Fetch token info
-	tokenInInfo, err := GetTokenInfo(u.client, tokenIn)
+	// Fetch token info (cached)
+	tokenInInfo, err := GetTokenInfo(ctx, u.client, u.cache, tokenIn)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get input token info: %w", err)
 	}
 
-	tokenOutInfo, err := GetTokenInfo(u.client, tokenOut)
+	tokenOutInfo, err := GetTokenInfo(ctx, u.client, u.cache, tokenOut)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get output token info: %w", err)
 	}
@@ -85,13 +88,13 @@ func (u *UniswapV3) GetQuote(
 	amountIn *big.Int,
 ) (*models.Quote, error) {
 
-	// Fetch token info
-	tokenInInfo, err := GetTokenInfo(u.client, tokenIn)
+	// Fetch token info (cached)
+	tokenInInfo, err := GetTokenInfo(ctx, u.client, u.cache, tokenIn)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get input token info: %w", err)
 	}
 
-	tokenOutInfo, err := GetTokenInfo(u.client, tokenOut)
+	tokenOutInfo, err := GetTokenInfo(ctx, u.client, u.cache, tokenOut)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get output token info: %w", err)
 	}

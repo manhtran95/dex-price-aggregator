@@ -9,6 +9,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/manhtran95/dex-price-aggregator/internal/cache"
 	"github.com/manhtran95/dex-price-aggregator/internal/contracts"
 	"github.com/manhtran95/dex-price-aggregator/internal/models"
 )
@@ -16,9 +17,10 @@ import (
 type SushiSwap struct {
 	client  *ethclient.Client
 	factory *contracts.UniswapV2Factory // Reuse UniswapV2 contract bindings
+	cache   *cache.RedisCache
 }
 
-func NewSushiSwap(client *ethclient.Client) (*SushiSwap, error) {
+func NewSushiSwap(client *ethclient.Client, redisCache *cache.RedisCache) (*SushiSwap, error) {
 	// SushiSwap factory address on Ethereum mainnet
 	factoryAddr := common.HexToAddress("0xC0AEe478e3658e2610c5F7A4A2E1777cE9e4f2Ac")
 	factory, err := contracts.NewUniswapV2Factory(factoryAddr, client)
@@ -29,6 +31,7 @@ func NewSushiSwap(client *ethclient.Client) (*SushiSwap, error) {
 	return &SushiSwap{
 		client:  client,
 		factory: factory,
+		cache:   redisCache,
 	}, nil
 }
 
@@ -52,13 +55,13 @@ func (s *SushiSwap) GetQuote(
 		return nil, fmt.Errorf("pair does not exist")
 	}
 
-	// Fetch token info
-	tokenInInfo, err := GetTokenInfo(s.client, tokenIn)
+	// Fetch token info (cached)
+	tokenInInfo, err := GetTokenInfo(ctx, s.client, s.cache, tokenIn)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get input token info: %w", err)
 	}
 
-	tokenOutInfo, err := GetTokenInfo(s.client, tokenOut)
+	tokenOutInfo, err := GetTokenInfo(ctx, s.client, s.cache, tokenOut)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get output token info: %w", err)
 	}

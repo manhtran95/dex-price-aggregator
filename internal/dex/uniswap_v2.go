@@ -5,10 +5,12 @@ import (
 	"fmt"
 	"log"
 	"math/big"
+	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/manhtran95/dex-price-aggregator/internal/cache"
 	"github.com/manhtran95/dex-price-aggregator/internal/contracts"
 	"github.com/manhtran95/dex-price-aggregator/internal/models"
 )
@@ -16,6 +18,7 @@ import (
 type UniswapV2 struct {
 	client  *ethclient.Client
 	factory *contracts.UniswapV2Factory
+	cache   *cache.RedisCache
 }
 
 type Reserves struct {
@@ -23,7 +26,7 @@ type Reserves struct {
 	Reserve1 *big.Int
 }
 
-func NewUniswapV2(client *ethclient.Client) (*UniswapV2, error) {
+func NewUniswapV2(client *ethclient.Client, redisCache *cache.RedisCache) (*UniswapV2, error) {
 	factoryAddr := common.HexToAddress("0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f")
 	factory, err := contracts.NewUniswapV2Factory(factoryAddr, client)
 	if err != nil {
@@ -33,6 +36,7 @@ func NewUniswapV2(client *ethclient.Client) (*UniswapV2, error) {
 	return &UniswapV2{
 		client:  client,
 		factory: factory,
+		cache:   redisCache,
 	}, nil
 }
 
@@ -54,13 +58,12 @@ func (u *UniswapV2) GetQuote(
 		return nil, fmt.Errorf("pair does not exist")
 	}
 
-	// Fetch token info
-	tokenInInfo, err := GetTokenInfo(u.client, tokenIn)
+	tokenInInfo, err := GetTokenInfo(ctx, u.client, u.cache, tokenIn)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get input token info: %w", err)
 	}
 
-	tokenOutInfo, err := GetTokenInfo(u.client, tokenOut)
+	tokenOutInfo, err := GetTokenInfo(ctx, u.client, u.cache, tokenOut)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get output token info: %w", err)
 	}
@@ -95,6 +98,17 @@ func (u *UniswapV2) getReserves(
 	ctx context.Context,
 	pairAddress, tokenA, tokenB common.Address,
 ) (*Reserves, error) {
+	// Check cache
+	if u.cache != nil {
+		reserve0, reserve1, err := u.cache.GetReserves(ctx, pairAddress)
+		if err == nil && reserve0 != nil {
+			return &Reserves{
+				Reserve0: reserve0,
+				Reserve1: reserve1,
+			}, nil
+		}
+	}
+
 	// Create pair contract instance
 	pair, err := contracts.NewUniswapV2Pair(pairAddress, u.client)
 	if err != nil {
@@ -115,6 +129,11 @@ func (u *UniswapV2) getReserves(
 			Reserve0: reserves.Reserve0,
 			Reserve1: reserves.Reserve1,
 		}, nil
+	}
+
+	// Cache for 12 seconds (1 block)
+	if u.cache != nil {
+		u.cache.SetReserves(ctx, pairAddress, reserves.Reserve0, reserves.Reserve1, 12*time.Second)
 	}
 
 	return &Reserves{
