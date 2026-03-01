@@ -37,6 +37,13 @@ func (r *RedisCache) Close() error {
 	return r.client.Close()
 }
 
+// Client returns the underlying go-redis client.
+// The concrete *redis.Client satisfies the ulule/limiter redis.Client interface,
+// so it can be passed directly to rate-limiter store constructors.
+func (r *RedisCache) Client() *redis.Client {
+	return r.client
+}
+
 // Pool Reserves Caching
 type ReservesCache struct {
 	Reserve0  string `json:"reserve0"`

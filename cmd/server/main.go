@@ -70,8 +70,8 @@ func main() {
 	// Initialize aggregator
 	agg := aggregator.NewAggregator(dexes, client.Client(), redisCache)
 
-	// Initialize router - pass aggregator in
-	router := api.NewRouter(client, cfg, agg)
+	// Initialize router
+	router := api.NewRouter(client, cfg, agg, redisCache)
 
 	log.Printf("Server starting on port %s", cfg.Port)
 	if err := http.ListenAndServe(":"+cfg.Port, router); err != nil {

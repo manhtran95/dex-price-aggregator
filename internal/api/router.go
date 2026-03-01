@@ -6,12 +6,17 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/manhtran95/dex-price-aggregator/internal/aggregator"
 	"github.com/manhtran95/dex-price-aggregator/internal/blockchain"
+	"github.com/manhtran95/dex-price-aggregator/internal/cache"
 	"github.com/manhtran95/dex-price-aggregator/internal/config"
 	"github.com/rs/cors"
 )
 
-func NewRouter(client *blockchain.Client, cfg *config.Config, agg *aggregator.Aggregator) http.Handler {
+func NewRouter(client *blockchain.Client, cfg *config.Config, agg *aggregator.Aggregator, redisCache *cache.RedisCache) http.Handler {
 	r := mux.NewRouter()
+
+	// redisCache may be nil (Redis unavailable) – NewRateLimiter falls back to in-memory store.
+	rateLimiter := NewRateLimiter(redisCache)
+	r.Use(RateLimitMiddleware(rateLimiter))
 
 	h := NewHandlers(client, cfg, agg)
 
