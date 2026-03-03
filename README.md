@@ -4,7 +4,7 @@ A Go-based service that aggregates prices from multiple decentralized exchanges 
 
 ## Features
 
-- **Multi-DEX Support** — Uniswap V2, Uniswap V3, SushiSwap
+- **Multi-DEX Support** — Uniswap V2, Uniswap V3, SushiSwap, Curve
 - **Multi-hop Graph-based Routing** — Finds optimal swap paths across up to 3 hops using a token graph
 - **Gas Estimation** — Estimates gas cost per route and factors it into best-route selection
 - **Rate Limiting** — Protects the API from abuse with configurable request rate limits
